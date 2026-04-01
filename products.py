@@ -1,26 +1,3 @@
-"""
-products.py
-===========
-Tous les produits financiers du pricer, organisés en classes.
-
-Hiérarchie :
-    BaseProduct
-    ├── ZeroCouponBond
-    ├── CouponBond
-    ├── InterestRateSwap
-    ├── BasisSwap
-    ├── EuropeanOption          (Call / Put vanille)
-    ├── BarrierOption           (KO / KI, via Monte Carlo)
-    ├── CallSpread
-    ├── PutSpread
-    ├── Butterfly
-    ├── AutocallProduct         (Monte Carlo)
-    └── StructuredNote          (Tracker, Capped, Barrier, Range)
-
-Chaque produit expose :
-    .price()   → float  (valeur de marché)
-    .greeks()  → dict   {delta, gamma, vega, theta, rho}  (si applicable)
-"""
 
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -28,9 +5,6 @@ import numpy as np
 from models import BlackScholes, RateCurve, MonteCarlo
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# BASE
-# ══════════════════════════════════════════════════════════════════════════════
 
 class BaseProduct(ABC):
     """Classe abstraite dont héritent tous les produits."""
@@ -48,26 +22,15 @@ class BaseProduct(ABC):
         return f"{self.__class__.__name__}(price={self.price():.4f})"
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 1. OBLIGATIONS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class ZeroCouponBond(BaseProduct):
     """
     Obligation Zéro-Coupon.
 
-    Payoff à maturité : Nominal
-    Prix = Nominal × DF(0, T)
     """
 
     def __init__(self, nominal: float, T: float, curve: RateCurve):
-        """
-        Parameters
-        ----------
-        nominal : float   Valeur faciale
-        T       : float   Maturité en années
-        curve   : RateCurve
-        """
+        
         self.nominal = nominal
         self.T       = T
         self.curve   = curve
@@ -90,21 +53,12 @@ class ZeroCouponBond(BaseProduct):
 class CouponBond(BaseProduct):
     """
     Obligation à coupons périodiques.
-
-    Prix = Σ (coupon × DF(0, t_i)) + Nominal × DF(0, T)
     """
 
     def __init__(self, nominal: float, coupon_rate: float, freq_per_year: float,
                  T: float, curve: RateCurve):
-        """
-        Parameters
-        ----------
-        nominal        : float  Valeur faciale
-        coupon_rate    : float  Taux de coupon annuel (décimal, ex: 0.05)
-        freq_per_year  : float  Fréquence de paiement par an (ex: 2 = semestriel)
-        T              : float  Maturité en années
-        curve          : RateCurve
-        """
+       
+    
         self.nominal       = nominal
         self.coupon_rate   = coupon_rate
         self.freq_per_year = freq_per_year
@@ -161,33 +115,14 @@ class CouponBond(BaseProduct):
         return {"dv01": dv01, "duration": self.duration(), "ytm": self.ytm()}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 2. SWAPS
-# ══════════════════════════════════════════════════════════════════════════════
-
 class InterestRateSwap(BaseProduct):
     """
     Swap de taux d'intérêt (fixe / variable).
-
-    Du point de vue du payeur fixe :
-        NPV = NPV_jambe_variable - NPV_jambe_fixe
-            = Nominal × (1 - DF(T)) - Nominal × taux_fixe × Σ(τ_i × DF(t_i))
-
-    Convention : taux variable = IBOR reconstitué depuis la courbe (projection).
     """
 
     def __init__(self, nominal: float, fixed_rate: float, freq_per_year: float,
                  T: float, curve: RateCurve, payer: bool = True):
-        """
-        Parameters
-        ----------
-        nominal      : float   Nominal du swap
-        fixed_rate   : float   Taux fixe (décimal)
-        freq_per_year: float   Fréquence de la jambe fixe (ex: 4 = trimestriel)
-        T            : float   Maturité en années
-        curve        : RateCurve
-        payer        : bool    True = on paie le fixe, False = on reçoit le fixe
-        """
+        
         self.nominal       = nominal
         self.fixed_rate    = fixed_rate
         self.freq_per_year = freq_per_year
@@ -230,23 +165,11 @@ class InterestRateSwap(BaseProduct):
 
 
 class BasisSwap(BaseProduct):
-    """
-    Basis Swap : échange de deux jambes variables (ex: 3M vs 6M).
-
-    NPV ≈ Nominal × [ΣτᵢⁿDF(tᵢⁿ)×fwd_n(tᵢ) - ΣτᵢᵐDF(tᵢᵐ)×fwd_m(tᵢ)]
-
-    Simplification : on utilise les forwards implicites de la courbe unique.
-    """
+    
 
     def __init__(self, nominal: float, freq1: float, freq2: float,
                  T: float, curve: RateCurve, spread: float = 0.0):
-        """
-        Parameters
-        ----------
-        freq1  : float   Fréquence jambe 1 (ex: 4 = trimestrielle)
-        freq2  : float   Fréquence jambe 2 (ex: 2 = semestrielle)
-        spread : float   Spread ajouté à la jambe 1 (décimal)
-        """
+       
         self.nominal = nominal
         self.freq1   = freq1
         self.freq2   = freq2
@@ -274,29 +197,14 @@ class BasisSwap(BaseProduct):
         return {}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 3. OPTIONS VANILLES
-# ══════════════════════════════════════════════════════════════════════════════
-
 class EuropeanOption(BaseProduct):
     """
-    Option européenne Call ou Put (formule analytique Black-Scholes).
+    Option européenne Call ou Put .
     """
 
     def __init__(self, S: float, K: float, T: float, r: float, q: float,
                  sigma: float, option_type: str = "call", quantity: float = 1.0):
-        """
-        Parameters
-        ----------
-        S           : spot price
-        K           : strike
-        T           : time to maturity (years)
-        r           : risk-free rate (decimal)
-        q           : dividend yield (decimal)
-        sigma       : volatility (decimal)
-        option_type : "call" ou "put"
-        quantity    : nombre de contrats (peut être négatif = vente)
-        """
+    
         self.S    = S
         self.K    = K
         self.T    = T
@@ -316,10 +224,6 @@ class EuropeanOption(BaseProduct):
                                      self.sigma, self.option_type)
         return {k: v * self.quantity for k, v in g.items()}
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 4. OPTIONS À BARRIÈRES (Monte Carlo BS)
-# ══════════════════════════════════════════════════════════════════════════════
 
 class BarrierOption(BaseProduct):
     """
@@ -395,15 +299,10 @@ class BarrierOption(BaseProduct):
                 "vega": vega * self.quantity}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 5. STRATÉGIES OPTIONNELLES (réplication statique)
-# ══════════════════════════════════════════════════════════════════════════════
+
 
 class CallSpread(BaseProduct):
-    """
-    Call Spread = Long Call(K1) + Short Call(K2),  K1 < K2.
-    Payoff : min(max(S_T - K1, 0), K2 - K1)
-    """
+    
 
     def __init__(self, S, K1, K2, T, r, q, sigma, quantity=1.0):
         self.long  = EuropeanOption(S, K1, T, r, q, sigma, "call",  quantity)
@@ -419,10 +318,7 @@ class CallSpread(BaseProduct):
 
 
 class PutSpread(BaseProduct):
-    """
-    Put Spread (baissier) = Long Put(K2) + Short Put(K1),  K1 < K2.
-    Payoff : min(max(K2 - S_T, 0), K2 - K1)
-    """
+   
 
     def __init__(self, S, K1, K2, T, r, q, sigma, quantity=1.0):
         self.long  = EuropeanOption(S, K2, T, r, q, sigma, "put",  quantity)
@@ -438,10 +334,7 @@ class PutSpread(BaseProduct):
 
 
 class Butterfly(BaseProduct):
-    """
-    Butterfly = Long Call(K1) + Short 2×Call(K2) + Long Call(K3)
-    avec K2 = (K1 + K3) / 2.
-    """
+    
 
     def __init__(self, S, K1, K2, K3, T, r, q, sigma, quantity=1.0):
         self.leg1 = EuropeanOption(S, K1, T, r, q, sigma, "call",  quantity)
@@ -457,29 +350,18 @@ class Butterfly(BaseProduct):
                 for k in keys}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 6. PRODUIT AUTOCALLABLE (Monte Carlo)
-# ══════════════════════════════════════════════════════════════════════════════
+
 
 class AutocallProduct(BaseProduct):
     """
     Produit Autocallable pricé par Monte Carlo.
 
-    Mécanisme (d'après l'inventaire) :
+    Mécanisme:
       - Observations bi-mensuelles (toutes les 2 périodes)
       - Niveau de rappel = 100%, baisse de 5% à chaque mois de février
       - Si rappelé à T_i : reçoit Nominal × (1 + coupon_rate × (T_i - T_ref) / 365)
       - Si jamais rappelé à la maturité finale : reçoit Nominal (sans coupon)
 
-    Parameters
-    ----------
-    S0              : spot initial
-    nominal         : valeur faciale
-    obs_dates       : liste de maturités en années (dates d'observation)
-    recall_levels   : liste des niveaux de rappel (décimal, ex: [1.0, 1.0, 0.95, ...])
-    coupon_rate     : taux de coupon annuel (ex: 0.08)
-    ref_date_years  : date de référence en années depuis aujourd'hui (pour le coupon)
-    r, q, sigma     : paramètres de marché
     """
 
     def __init__(self, S0: float, nominal: float,
@@ -546,9 +428,7 @@ class AutocallProduct(BaseProduct):
         return {"delta": delta, "vega": vega}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 7. NOTES STRUCTURÉES
-# ══════════════════════════════════════════════════════════════════════════════
+
 
 class StructuredNote(BaseProduct):
     """
@@ -576,18 +456,7 @@ class StructuredNote(BaseProduct):
                  cap: float = None, barrier1: float = None, barrier2: float = None,
                  bonus_rate: float = 0.10,
                  n_paths: int = 50_000, n_steps: int = 252):
-        """
-        Parameters
-        ----------
-        sspa_code     : int    Code SSPA du produit (1100, 1130, 1220, 1320)
-        nominal       : float  Valeur nominale unitaire
-        quantity      : int    Nombre d'unités
-        participation : float  Taux de participation au sous-jacent
-        cap           : float  Niveau de cap (prix absolu, ex: 280$)
-        barrier1      : float  Première barrière (prix absolu)
-        barrier2      : float  Deuxième barrière (prix absolu)
-        bonus_rate    : float  Bonus pour la range note (ex: 0.10 = 10%)
-        """
+
         self.sspa_code    = sspa_code
         self.nominal      = nominal
         self.quantity     = quantity

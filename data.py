@@ -1,17 +1,13 @@
-"""
-data.py
-=======
-Fetching market data:
-  - Stock prices via yfinance (AAPL)
-  - Rate curve via FRED (US Treasury yields, proxy for risk-free rate)
-  - Historical volatility computation
-"""
+
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
 import requests
 from datetime import datetime
+
+# ─── FRED API key ──────────────────────────────────────────────────────────────
+FRED_API_KEY = "cbbf17dd89bd56cd2a5353ee0ae0ae76"
 
 # ─── FRED series ID → maturity in years ───────────────────────────────────────
 FRED_SERIES = {
@@ -47,14 +43,16 @@ def fetch_rate_curve(as_of: datetime = None) -> dict:
     rates = {}
     for series_id, mat in FRED_SERIES.items():
         try:
-            url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
-            df = pd.read_csv(url, parse_dates=["DATE"])
-            df = df[df["VALUE"] != "."].copy()
-            df["VALUE"] = df["VALUE"].astype(float) / 100.0   # % → decimal
-            df = df.sort_values("DATE")
-            subset = df[df["DATE"] <= pd.Timestamp(as_of)]
-            if not subset.empty:
-                rates[mat] = float(subset.iloc[-1]["VALUE"])
+            url = (
+                f"https://api.stlouisfed.org/fred/series/observations"
+                f"?series_id={series_id}&api_key={FRED_API_KEY}&file_type=json"
+                f"&observation_end={as_of.strftime('%Y-%m-%d')}&sort_order=desc&limit=1"
+            )
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+            obs = resp.json().get("observations", [])
+            if obs and obs[0]["value"] != ".":
+                rates[mat] = float(obs[0]["value"]) / 100.0   # % → decimal
         except Exception:
             pass  # will use fallback below
 

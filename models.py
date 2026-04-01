@@ -1,11 +1,4 @@
-"""
-models.py
-=========
-Pricing models:
-  - RateCurve   : bootstrap zero-coupon curve + Nelson-Siegel calibration
-  - BlackScholes: analytical pricing + Greeks for European options
-  - Monte Carlo  : simulation helper used by complex products (autocall, barriers)
-"""
+
 
 import numpy as np
 from scipy.stats import norm
@@ -13,29 +6,14 @@ from scipy.optimize import minimize, brentq
 from scipy.interpolate import interp1d
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 1. RATE CURVE
-# ══════════════════════════════════════════════════════════════════════════════
 
 class RateCurve:
     """
-    Zero-coupon rate curve built by bootstrapping market rates (par rates or
-    zero rates from FRED) and interpolating linearly on zero rates.
-
-    Usage
-    -----
-    >>> curve = RateCurve.from_dict({0.25: 0.053, 1.0: 0.050, 5.0: 0.045, 10.0: 0.044})
-    >>> curve.discount_factor(2.5)
-    >>> curve.zero_rate(7.0)
+    Zero-coupon rate curve built by bootstrapping market rates  and interpolating linearly on zero rates.
     """
 
     def __init__(self, maturities: list, zero_rates: list):
-        """
-        Parameters
-        ----------
-        maturities : list[float]   in years, sorted ascending
-        zero_rates : list[float]   continuously-compounded zero rates (decimal)
-        """
+       
         idx = np.argsort(maturities)
         self.maturities = np.array(maturities)[idx]
         self.zero_rates  = np.array(zero_rates)[idx]
@@ -49,7 +27,7 @@ class RateCurve:
             r0 = self.zero_rates[0]
             self._interp = lambda t: r0
 
-    # ── class methods ─────────────────────────────────────────────────────────
+
 
     @classmethod
     def from_dict(cls, rate_dict: dict):
@@ -60,10 +38,9 @@ class RateCurve:
 
     @classmethod
     def flat(cls, rate: float = 0.04):
-        """Convenience: flat curve at *rate*."""
+        
         return cls([0.001, 50.0], [rate, rate])
 
-    # ── Nelson-Siegel calibration ─────────────────────────────────────────────
 
     @classmethod
     def nelson_siegel(cls, market_mats: list, market_rates: list):
@@ -71,9 +48,6 @@ class RateCurve:
         Calibrate a Nelson-Siegel curve to market zero rates and return a
         RateCurve object built on a fine grid.
 
-        Nelson-Siegel:
-            r(T) = β0 + β1 * (1 - e^(-T/τ)) / (T/τ)
-                      + β2 * [(1 - e^(-T/τ)) / (T/τ)  -  e^(-T/τ)]
         """
         market_mats  = np.array(market_mats,  dtype=float)
         market_rates = np.array(market_rates, dtype=float)
@@ -103,7 +77,6 @@ class RateCurve:
         fine_rates = ns_rate(fine_mats, b0, b1, b2, tau)
         return cls(fine_mats.tolist(), fine_rates.tolist())
 
-    # ── core methods ──────────────────────────────────────────────────────────
 
     def zero_rate(self, T: float) -> float:
         """Continuously-compounded zero rate at maturity T (years)."""
@@ -136,26 +109,13 @@ class RateCurve:
         return (1.0 - dfs[-1]) / annuity
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 2. BLACK-SCHOLES MODEL
-# ══════════════════════════════════════════════════════════════════════════════
+
 
 class BlackScholes:
     """
     Analytical Black-Scholes pricing and Greeks for European vanilla options.
-
-    All methods are static – no need to instantiate.
-
-    Parameters used throughout:
-        S     : current spot price
-        K     : strike price
-        T     : time to maturity in years
-        r     : risk-free rate (continuously compounded, decimal)
-        q     : continuous dividend yield (decimal)
-        sigma : annualized volatility (decimal)
     """
 
-    # ── d1 / d2 ───────────────────────────────────────────────────────────────
 
     @staticmethod
     def d1(S, K, T, r, q, sigma):
@@ -165,7 +125,7 @@ class BlackScholes:
     def d2(S, K, T, r, q, sigma):
         return BlackScholes.d1(S, K, T, r, q, sigma) - sigma * np.sqrt(T)
 
-    # ── price ─────────────────────────────────────────────────────────────────
+
 
     @staticmethod
     def price(S, K, T, r, q, sigma, option_type="call") -> float:
@@ -179,7 +139,6 @@ class BlackScholes:
         else:
             return K * np.exp(-r * T) * norm.cdf(-d2) - S * np.exp(-q * T) * norm.cdf(-d1)
 
-    # ── Greeks ────────────────────────────────────────────────────────────────
 
     @staticmethod
     def delta(S, K, T, r, q, sigma, option_type="call") -> float:
@@ -248,7 +207,6 @@ class BlackScholes:
             "rho":   BlackScholes.rho(S, K, T, r, q, sigma, option_type),
         }
 
-    # ── implied volatility (Newton-Raphson) ───────────────────────────────────
 
     @staticmethod
     def implied_vol(S, K, T, r, q, market_price, option_type="call",
@@ -279,20 +237,10 @@ class BlackScholes:
         return max(sigma, 1e-6)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 3. MONTE CARLO ENGINE
-# ══════════════════════════════════════════════════════════════════════════════
 
 class MonteCarlo:
     """
-    Generic Monte Carlo simulator under the Black-Scholes / GBM framework.
-
-    Usage
-    -----
-    >>> mc = MonteCarlo(S0=220, r=0.04, q=0.005, sigma=0.28, T=2.0,
-    ...                 n_paths=50_000, n_steps=252*2, seed=42)
-    >>> paths = mc.simulate()   # shape (n_paths, n_steps+1)
-    >>> mc.price(payoff_fn)     # price = e^(-rT) * mean(payoff)
+    Monte Carlo simulator under the Black-Scholes / GBM framework.
     """
 
     def __init__(self, S0: float, r: float, q: float, sigma: float, T: float,
@@ -310,11 +258,6 @@ class MonteCarlo:
     def simulate(self) -> np.ndarray:
         """
         Simulate GBM paths using antithetic variates for variance reduction.
-
-        Returns
-        -------
-        np.ndarray  shape (n_paths, n_steps + 1)
-                    paths[:, 0] == S0 for all paths
         """
         rng   = np.random.default_rng(self.seed)
         dt    = self.T / self.n_steps
@@ -333,11 +276,6 @@ class MonteCarlo:
     def price(self, payoff_fn, use_cached: bool = True) -> float:
         """
         Price an instrument given a payoff function.
-
-        Parameters
-        ----------
-        payoff_fn : callable  f(paths) -> np.ndarray of shape (n_paths,)
-                              *paths* has shape (n_paths, n_steps + 1)
         """
         paths = self._paths if (use_cached and self._paths is not None) else self.simulate()
         payoffs = payoff_fn(paths)

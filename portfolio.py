@@ -1,14 +1,3 @@
-"""
-portfolio.py
-============
-Chargement de l'inventaire Excel, pricing agrégé et calcul des risques.
-
-Fonctions principales :
-    load_market_data()          → snapshot de marché (spot, vol, courbe)
-    load_portfolio()            → liste de BaseProduct depuis Inventaire.xlsx
-    price_portfolio(products)   → DataFrame avec prix et Greeks par produit
-    risk_matrix(products)       → matrice de risque par maturité × strike
-"""
 
 import json
 import numpy as np
@@ -24,9 +13,6 @@ from products import (
     AutocallProduct, StructuredNote,
 )
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ──────────────────────────────────────────────────────────────────────────────
 
 VALUATION_DATE = datetime(2026, 2, 27)
 
@@ -51,18 +37,10 @@ def _freq_from_str(freq_str) -> float:
     return float(mapping.get(str(freq_str).strip().upper(), 1))
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Chargement des données de marché
-# ──────────────────────────────────────────────────────────────────────────────
 
 def load_market_data() -> dict:
     """
     Charge le snapshot de marché depuis docs/ et construit la courbe de taux.
-
-    Returns
-    -------
-    dict avec les clés :
-        spot, sigma, div_yield, r (taux court), curve (RateCurve)
     """
     # Snapshot AAPL
     with open("docs/market_snapshot.json") as f:
@@ -92,19 +70,10 @@ def load_market_data() -> dict:
     }
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Chargement de l'inventaire
-# ──────────────────────────────────────────────────────────────────────────────
 
 def load_portfolio(xlsx_path: str = "Inventaire.xlsx") -> dict:
     """
     Lit Inventaire.xlsx et retourne un dict { portefeuille: [list of BaseProduct] }.
-
-    Les 4 portefeuilles sont :
-        "Swap"             → InterestRateSwap / BasisSwap
-        "Options"          → CallSpread, PutSpread, Butterfly, BarrierOption, EuropeanOption
-        "Autocall"         → AutocallProduct
-        "Notes structurées"→ StructuredNote
     """
     mkt = load_market_data()
     S   = mkt["spot"]
@@ -114,7 +83,7 @@ def load_portfolio(xlsx_path: str = "Inventaire.xlsx") -> dict:
 
     portfolios = {}
 
-    # ── Portefeuille 1 : Swaps ────────────────────────────────────────────────
+    #  Portefeuille 1 : Swaps 
     df_swap = pd.read_excel(xlsx_path, sheet_name="Swap", header=0)
     swaps = []
     for _, row in df_swap.iterrows():
@@ -153,7 +122,7 @@ def load_portfolio(xlsx_path: str = "Inventaire.xlsx") -> dict:
 
     portfolios["Swap"] = swaps
 
-    # ── Portefeuille 2 : Options ───────────────────────────────────────────────
+    #  Portefeuille 2 : Options 
     df_opt = pd.read_excel(xlsx_path, sheet_name="Options", header=0)
     options = []
     for _, row in df_opt.iterrows():
@@ -212,7 +181,7 @@ def load_portfolio(xlsx_path: str = "Inventaire.xlsx") -> dict:
 
     portfolios["Options"] = options
 
-    # ── Portefeuille 3 : Autocall ──────────────────────────────────────────────
+    #  Portefeuille 3 : Autocall 
     df_ac = pd.read_excel(xlsx_path, sheet_name="Autocall", header=0)
 
     # Construction du schedule d'observation à partir de la première ligne réelle
@@ -268,7 +237,7 @@ def load_portfolio(xlsx_path: str = "Inventaire.xlsx") -> dict:
 
     portfolios["Autocall"] = autocalls
 
-    # ── Portefeuille 4 : Notes structurées ────────────────────────────────────
+    #  Portefeuille 4 : Notes structurées 
     df_ns = pd.read_excel(xlsx_path, sheet_name="Notes structurées", header=0)
     notes = []
     SSPA_EXPECTED = {
@@ -319,9 +288,6 @@ def load_portfolio(xlsx_path: str = "Inventaire.xlsx") -> dict:
     return portfolios
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Pricing agrégé
-# ──────────────────────────────────────────────────────────────────────────────
 
 def price_portfolio(portfolios: dict) -> pd.DataFrame:
     """
@@ -351,9 +317,6 @@ def price_portfolio(portfolios: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Matrice de risque par pilier
-# ──────────────────────────────────────────────────────────────────────────────
 
 def risk_matrix(portfolios: dict, greek: str = "delta") -> pd.DataFrame:
     """
@@ -388,9 +351,7 @@ def risk_matrix(portfolios: dict, greek: str = "delta") -> pd.DataFrame:
     return df
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Script autonome (test rapide)
-# ──────────────────────────────────────────────────────────────────────────────
+
 
 if __name__ == "__main__":
     print("Chargement du portefeuille…")

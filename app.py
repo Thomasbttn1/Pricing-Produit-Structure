@@ -1,13 +1,4 @@
-"""
-app.py  –  Dashboard Streamlit : Multi-Product Pricer
-======================================================
-Lancer avec :  streamlit run app.py
 
-Pages :
-    1. Marché & Calibration   → courbe de taux, vol historique, snapshot AAPL
-    2. Pricer unitaire        → saisie manuelle d'un produit + prix & Greeks
-    3. Portefeuille           → inventaire complet pricé + agrégats + matrice de risque
-"""
 
 import json
 import numpy as np
@@ -26,19 +17,12 @@ from products import (
 )
 from portfolio import load_market_data, load_portfolio, price_portfolio, risk_matrix
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Config générale
-# ─────────────────────────────────────────────────────────────────────────────
 
 st.set_page_config(
     page_title="Pricer – Produits Structurés",
     page_icon="📈",
     layout="wide",
 )
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Cache : données de marché (chargées une seule fois)
-# ─────────────────────────────────────────────────────────────────────────────
 
 @st.cache_data(show_spinner="Chargement des données de marché…")
 def get_market():
@@ -53,10 +37,6 @@ def get_portfolio_df():
     dv   = risk_matrix(ptfs, "vega")
     return df, dm, dv, ptfs
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Sidebar – navigation
-# ─────────────────────────────────────────────────────────────────────────────
 
 st.sidebar.title("📊 Navigation")
 page = st.sidebar.radio(
@@ -80,16 +60,11 @@ st.sidebar.markdown(f"**Div yield :** {q:.3%}")
 st.sidebar.markdown(f"*Date de valorisation : 27/02/2026*")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE 1 : Marché & Calibration
-# ══════════════════════════════════════════════════════════════════════════════
-
 if page == "🌍 Marché & Calibration":
     st.title("🌍 Données de Marché & Calibration")
 
     col1, col2 = st.columns(2)
 
-    # ── Courbe de taux ────────────────────────────────────────────────────────
     with col1:
         st.subheader("Courbe de taux zéro-coupon (US Treasury)")
 
@@ -117,7 +92,7 @@ if page == "🌍 Marché & Calibration":
         rate_df.columns = ["Maturité (Y)", "Taux (%)"]
         st.dataframe(rate_df, use_container_width=True, hide_index=True)
 
-    # ── Prix AAPL & volatilité ─────────────────────────────────────────────────
+    # ── Prix AAPL & volatilité 
     with col2:
         st.subheader("Historique AAPL (2 ans)")
 
@@ -147,7 +122,7 @@ if page == "🌍 Marché & Calibration":
                                height=300, margin=dict(t=20))
         st.plotly_chart(fig_vol, use_container_width=True)
 
-    # ── Surface de volatilité implicite (paramétrique, terme structure) ────────
+    #  Surface de volatilité implicite (paramétrique, terme structure) 
     st.subheader("Structure par terme de volatilité (réalisée)")
     snap = mkt["snap"]
     vol_ts = snap.get("vol_term_structure", {})
@@ -161,9 +136,6 @@ if page == "🌍 Marché & Calibration":
         st.plotly_chart(fig_vts, use_container_width=True)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE 2 : Pricer Unitaire
-# ══════════════════════════════════════════════════════════════════════════════
 
 elif page == "🔧 Pricer Unitaire":
     st.title("🔧 Pricer Unitaire")
@@ -190,7 +162,7 @@ elif page == "🔧 Pricer Unitaire":
 
     st.markdown("---")
 
-    # ── Obligation Zéro-Coupon ────────────────────────────────────────────────
+    # Obligation Zéro-Coupon 
     if product_type == "Obligation Zéro-Coupon":
         nominal = st.number_input("Nominal (€)", value=1_000_000, step=100_000)
         T_ui    = st.number_input("Maturité (années)", value=2.0, step=0.25)
@@ -200,7 +172,7 @@ elif page == "🔧 Pricer Unitaire":
             g = p.greeks()
             st.json(g)
 
-    # ── Obligation à Coupons ──────────────────────────────────────────────────
+    #  Obligation à Coupons
     elif product_type == "Obligation à Coupons":
         nominal   = st.number_input("Nominal (€)", value=1_000_000, step=100_000)
         cpn_rate  = st.number_input("Taux coupon (%)", value=5.0, step=0.25) / 100
@@ -213,7 +185,7 @@ elif page == "🔧 Pricer Unitaire":
             c2.metric("YTM", f"{p.ytm():.3%}")
             c3.metric("Duration", f"{p.duration():.2f} ans")
 
-    # ── Swap ──────────────────────────────────────────────────────────────────
+    #  Swap 
     elif product_type == "Swap Fixe / Variable":
         nominal   = st.number_input("Nominal (€)", value=1_000_000, step=100_000)
         fixed_rt  = st.number_input("Taux fixe (%)", value=5.0, step=0.1) / 100
@@ -228,7 +200,7 @@ elif page == "🔧 Pricer Unitaire":
             c2.metric("Taux de marché (par)", f"{p.par_rate():.3%}")
             st.metric("DV01", f"€ {p.greeks()['dv01']:,.1f}")
 
-    # ── Options Vanilles ──────────────────────────────────────────────────────
+    #  Options Vanilles 
     elif product_type == "Call / Put Vanille":
         opt_type = st.radio("Type", ["call", "put"])
         K_ui     = st.number_input("Strike", value=260.0, step=5.0)
@@ -260,7 +232,7 @@ elif page == "🔧 Pricer Unitaire":
                                    height=300, margin=dict(t=10))
             st.plotly_chart(fig_pnl, use_container_width=True)
 
-    # ── Call Spread ────────────────────────────────────────────────────────────
+    #  Call Spread 
     elif product_type == "Call Spread":
         K1   = st.number_input("Strike bas (K1)", value=240.0, step=5.0)
         K2   = st.number_input("Strike haut (K2)", value=270.0, step=5.0)
@@ -280,7 +252,7 @@ elif page == "🔧 Pricer Unitaire":
 
             st.json({k: round(v, 4) for k, v in g.items()})
 
-    # ── Put Spread ─────────────────────────────────────────────────────────────
+    #  Put Spread 
     elif product_type == "Put Spread":
         K1   = st.number_input("Strike bas (K1)", value=200.0, step=5.0)
         K2   = st.number_input("Strike haut (K2)", value=230.0, step=5.0)
@@ -296,7 +268,7 @@ elif page == "🔧 Pricer Unitaire":
             fig.update_layout(xaxis_title="S_T", yaxis_title="P&L", height=300, margin=dict(t=10))
             st.plotly_chart(fig, use_container_width=True)
 
-    # ── Butterfly ──────────────────────────────────────────────────────────────
+    #  Butterfly 
     elif product_type == "Butterfly":
         K1   = st.number_input("Strike bas (K1)", value=220.0, step=5.0)
         K2   = st.number_input("Strike central (K2)", value=250.0, step=5.0)
@@ -314,7 +286,7 @@ elif page == "🔧 Pricer Unitaire":
             fig.update_layout(xaxis_title="S_T", yaxis_title="P&L", height=300, margin=dict(t=10))
             st.plotly_chart(fig, use_container_width=True)
 
-    # ── Barrière ───────────────────────────────────────────────────────────────
+    #  Barrière 
     elif product_type == "Option à Barrière (KO/KI)":
         opt_type  = st.radio("Type", ["call", "put"])
         K_ui      = st.number_input("Strike", value=260.0, step=5.0)
@@ -332,7 +304,7 @@ elif page == "🔧 Pricer Unitaire":
             c2.metric("Vanille équivalente", f"${vanilla.price():,.4f}")
             st.caption("Prix calculé par Monte Carlo (50 000 trajectoires)")
 
-    # ── Autocall ───────────────────────────────────────────────────────────────
+    #  Autocall 
     elif product_type == "Autocallable":
         st.markdown("**Structure :** bi-mensuel, niveau recall 100% → -5%/an (février), cpn=8%/an")
         n_obs   = st.slider("Nombre d'observations", 6, 30, 12)
@@ -357,7 +329,7 @@ elif page == "🔧 Pricer Unitaire":
             sched = pd.DataFrame({"T (années)": obs, "Recall level": recalls})
             st.dataframe(sched, hide_index=True, use_container_width=True)
 
-    # ── Note Structurée ────────────────────────────────────────────────────────
+    #  Note Structurée 
     elif product_type == "Note Structurée":
         sspa   = st.selectbox("Code SSPA", [1100, 1130, 1220, 1320])
         nominal = st.number_input("Nominal unitaire ($)", value=1.0, step=0.1)
@@ -384,17 +356,13 @@ elif page == "🔧 Pricer Unitaire":
             st.json({k: round(v, 4) for k, v in g.items()})
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE 3 : Portefeuille
-# ══════════════════════════════════════════════════════════════════════════════
-
 elif page == "💼 Portefeuille":
     st.title("💼 Vue Portefeuille – Inventaire Complet")
 
     with st.spinner("Pricing en cours (Monte Carlo inclus)…"):
         df, dm_delta, dm_vega, ptfs = get_portfolio_df()
 
-    # ── Résumé agrégé ─────────────────────────────────────────────────────────
+    #  Résumé agrégé 
     st.subheader("📊 Prix agrégé par portefeuille")
 
     summary = df.groupby("Portefeuille")["Prix"].agg(["sum", "count"])
@@ -405,7 +373,7 @@ elif page == "💼 Portefeuille":
     grand_total = df["Prix"].sum()
     st.metric("💰 Valeur totale du portefeuille", f"${grand_total:,.2f}")
 
-    # ── Tableau détaillé ──────────────────────────────────────────────────────
+    #  Tableau détaillé 
     st.subheader("📋 Positions détaillées")
     ptf_filter = st.multiselect(
         "Filtrer par portefeuille",
@@ -421,7 +389,7 @@ elif page == "💼 Portefeuille":
         use_container_width=True, hide_index=True,
     )
 
-    # ── Matrice de risque Delta ────────────────────────────────────────────────
+    #  Matrice de risque Delta 
     st.subheader("🎯 Matrice de risque – Delta par pilier de maturité")
     fig_delta = px.imshow(
         dm_delta.astype(float),
@@ -433,7 +401,7 @@ elif page == "💼 Portefeuille":
     fig_delta.update_layout(height=350, margin=dict(t=40))
     st.plotly_chart(fig_delta, use_container_width=True)
 
-    # ── Matrice de risque Vega ─────────────────────────────────────────────────
+    #  Matrice de risque Vega 
     st.subheader("📉 Matrice de risque – Vega par pilier de maturité")
     fig_vega = px.imshow(
         dm_vega.fillna(0).astype(float),
@@ -445,7 +413,7 @@ elif page == "💼 Portefeuille":
     fig_vega.update_layout(height=350, margin=dict(t=40))
     st.plotly_chart(fig_vega, use_container_width=True)
 
-    # ── Distribution des prix ──────────────────────────────────────────────────
+    #  Distribution des prix 
     st.subheader("📊 Distribution de la valeur par portefeuille")
     fig_bar = px.bar(
         df.groupby("Portefeuille")["Prix"].sum().reset_index(),
@@ -455,7 +423,7 @@ elif page == "💼 Portefeuille":
     fig_bar.update_layout(showlegend=False, height=300, margin=dict(t=10))
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    # ── Ajouter un nouveau sous-jacent ─────────────────────────────────────────
+    #  Ajouter un nouveau sous-jacent 
     st.markdown("---")
     st.subheader("➕ Ajouter un nouveau sous-jacent")
     with st.form("new_underlying"):

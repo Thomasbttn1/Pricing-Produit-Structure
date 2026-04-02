@@ -122,7 +122,7 @@ if page == "🌍 Marché & Calibration":
         st.subheader("Historique AAPL (2 ans)")
 
         prices = pd.read_csv("docs/AAPL_prices.csv", parse_dates=["date"], index_col="date")
-        prices = prices.last("2Y")
+        prices = prices[prices.index >= prices.index.max() - pd.DateOffset(years=2)]
 
         fig_px = go.Figure()
         fig_px.add_trace(go.Scatter(
